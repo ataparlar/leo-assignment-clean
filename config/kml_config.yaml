@@ -1,0 +1,5 @@
+# kml_parser node config file
+
+/kml_parser/kml_parser:
+  ros__parameters:
+    kml_file: '/home/ataparlar/leo_ws/src/point_cloud_registering/data/test_route.kml'

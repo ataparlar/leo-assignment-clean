@@ -1,0 +1,6 @@
+# point_cloud_registering node config file
+
+/point_cloud_registering/point_cloud_registering:
+  ros__parameters:
+    pcd_file1: '/home/ataparlar/leo_ws/src/point_cloud_registering/data/capture0001.pcd'
+    pcd_file2: '/home/ataparlar/leo_ws/src/point_cloud_registering/data/capture0002.pcd'
