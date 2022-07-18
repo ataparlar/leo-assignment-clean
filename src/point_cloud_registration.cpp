@@ -8,6 +8,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/point_field.hpp"
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <geometry_msgs/msg/quaternion_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -50,28 +51,52 @@ public:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_publisher_2;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_publisher_aligned;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pc_publisher_error;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscription_;
 
     using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
     using PointSource = pcl::PointXYZ;
     using PointTarget = pcl::PointXYZ;
     using PointT = pcl::PointXYZ;
-    
 
 
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr file_loader(std::string file)
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr file_loader(std::string file)
     // Loads a .pcd file and returns a cloud
     {
         this->declare_parameter<std::string>(file, "default"); //"pcd_file1"
 
         this->get_parameter(file, pcd_file1); //"pcd_file1"
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-        pcl::io::loadPCDFile<pcl::PointXYZ>(this->pcd_file1, *cloud);
+        pcl::io::loadPCDFile<pcl::PointXYZRGB>(this->pcd_file1, *cloud);
 
         return cloud;
     };
+
+
+    void make_color(const sensor_msgs::msg::PointCloud2::SharedPtr msg) const
+    {
+        // sensor_msgs::msg::PointCloud2::SharedPtr best_cloud(new sensor_msgs::msg::PointCloud2);
+
+        for (int a=0; a < msg->height*msg->width; a++)
+        {
+            msg->fields[a].name = "rgb";
+//            msg->fields[0].offset
+            msg->fields[a].datatype = 6;
+//            msg->fields[0].count
+        }
+
+//        RCLCPP_INFO_STREAM(this->get_logger(), "Fields "
+//                << "name: " << msg->fields[0].name << " \n"
+//                << "offset: " << msg->fields[0].offset << " \n"
+//                << "datatype: " << msg->fields[0].datatype << " \n"
+//                << "count: " << msg->fields[0].count << " \n"
+//                << " \n\n");
+
+        // return best_cloud;
+    }
+
+
 
 
 
@@ -88,61 +113,76 @@ public:
         pc_publisher_aligned = this->create_publisher<sensor_msgs::msg::PointCloud2>("/points_aligned", 10);
         pc_publisher_error = this->create_publisher<std_msgs::msg::Float64>("/points_error", 1);
 
+        // subscribers
+
+        subscription_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+                "points1", 10, std::bind(&MainClass::make_color, this, std::placeholders::_1));
+
         sensor_msgs::msg::PointCloud2 ros_cloud1;
         sensor_msgs::msg::PointCloud2 ros_cloud2;
         sensor_msgs::msg::PointCloud2 aligned_ros;
         std_msgs::msg::Float64 score;
 
-        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud1 = file_loader("pcd_file1");
-        pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud2 = file_loader("pcd_file2");
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_cloud1 = file_loader("pcd_file1");
+        //pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_cloud2 = file_loader("pcd_file2");
+
+
 
         pcl::toROSMsg(*pcl_cloud1, ros_cloud1);
-        pcl::toROSMsg(*pcl_cloud2, ros_cloud2);
+
+
+        //pcl::toROSMsg(*pcl_cloud2, ros_cloud2);
 
         RCLCPP_INFO_STREAM(this->get_logger(), "Loaded "
                                                    << pcl_cloud1->width * pcl_cloud1->height
-                                                   << " data points from 1.pcd with the following fields: ");
-        RCLCPP_INFO_STREAM(this->get_logger(), "Loaded "
-                                                   << pcl_cloud2->width * pcl_cloud2->height
-                                                   << " data points from 2.pcd with the following fields: ");
+                                                   << " data points from 1.pcd with the following fields: \n");
+
+//        RCLCPP_INFO_STREAM(this->get_logger(), "Colors are: \n"
+//                << "R: " << pcl_cloud1->points[555].r << "\n"
+//                << "G: " << pcl_cloud1->points[555].b << "\n"
+//                << "B: " << pcl_cloud1->points[555].g << "\n\n");
+
+//        RCLCPP_INFO_STREAM(this->get_logger(), "Loaded "
+//                                                   << pcl_cloud2->width * pcl_cloud2->height
+//                                                   << " data points from 2.pcd with the following fields: ");
 
 
 
 
 
 
-        // gicp part
-
-        //pcl::PointCloud<PointSource>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>);
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZ>);
-        //pcl::PointCloud<PointSource>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZ>);
-
-        cloud1 = pcl_cloud1;
-        cloud2 = pcl_cloud2;
-
-        pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
-
-        gicp.setTransformationEpsilon(1e-8);
-        gicp.setMaximumIterations(5);
-
-        pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-
-        gicp.setInputSource(cloud2);
-        gicp.setInputTarget(cloud1);
-        gicp.align(*aligned_cloud);
-
-        Eigen::Matrix4f src2tgt   = gicp.getFinalTransformation();
-        score.data                = gicp.getFitnessScore();
-        bool is_converged         = gicp.hasConverged();
-
-        RCLCPP_INFO_STREAM(this->get_logger(), "transform matrix: " << "\n" << src2tgt << "\n"
-                                            << "fitness score: " << score.data << "\n"
-                                            << "is converged: " << is_converged << "\n");
-
-        pcl::toROSMsg(*aligned_cloud, aligned_ros);
-
-        pcl::io::savePCDFileASCII("test_pcd.pcd", *aligned_cloud);
+//        // gicp part
+//
+//        //pcl::PointCloud<PointSource>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>);
+//        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>);
+//        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZ>);
+//        //pcl::PointCloud<PointSource>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZ>);
+//
+//        cloud1 = pcl_cloud1;
+//        cloud2 = pcl_cloud2;
+//
+//        pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
+//
+//        gicp.setTransformationEpsilon(1e-8);
+//        gicp.setMaximumIterations(5);
+//
+//        pcl::PointCloud<pcl::PointXYZ>::Ptr aligned_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+//
+//        gicp.setInputSource(cloud2);
+//        gicp.setInputTarget(cloud1);
+//        gicp.align(*aligned_cloud);
+//
+//        Eigen::Matrix4f src2tgt   = gicp.getFinalTransformation();
+//        score.data                = gicp.getFitnessScore();
+//        bool is_converged         = gicp.hasConverged();
+//
+//        RCLCPP_INFO_STREAM(this->get_logger(), "transform matrix: " << "\n" << src2tgt << "\n"
+//                                            << "fitness score: " << score.data << "\n"
+//                                            << "is converged: " << is_converged << "\n");
+//
+//        pcl::toROSMsg(*aligned_cloud, aligned_ros);
+//
+//        pcl::io::savePCDFileASCII("test_pcd.pcd", *aligned_cloud);
 
 
 
@@ -158,10 +198,10 @@ public:
             aligned_ros.header.frame_id = "map";
             aligned_ros.header.stamp = this->get_clock()->now();
 
-            pc_publisher_->publish(ros_cloud1);
-            pc_publisher_2->publish(ros_cloud2);
-            pc_publisher_aligned->publish(aligned_ros);
-            pc_publisher_error->publish(score);
+            pc_publisher_->publish(ros_cloud1); //ros_cloud1
+//            pc_publisher_2->publish(ros_cloud2);
+//            pc_publisher_aligned->publish(aligned_ros);
+//            pc_publisher_error->publish(score);
         }
 
     };

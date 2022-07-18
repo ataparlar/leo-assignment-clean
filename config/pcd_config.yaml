@@ -2,5 +2,6 @@
 
 /point_cloud_registering/point_cloud_registering:
   ros__parameters:
-    pcd_file1: '/home/ataparlar/leo_ws/src/point_cloud_registering/data/capture0001.pcd'
-    pcd_file2: '/home/ataparlar/leo_ws/src/point_cloud_registering/data/capture0002.pcd'
+    pcd_file1: '/home/ataparlar/Desktop/pointcloud/team30_local_subsampled2.pcd'
+    pcd_file2: '/home/ataparlar/projects/ataparlar_ws/src/leo-assignment-clean/data/capture0002.pcd'
+    #'/home/ataparlar/leo_ws/src/point_cloud_registering/data/capture0001.pcd'

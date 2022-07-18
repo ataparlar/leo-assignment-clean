@@ -26,7 +26,7 @@ def generate_launch_description():
 
     param_file_path = str(pathlib.Path(__file__).parents[5])
     # /home/ataparlar/leo_ws
-    param_file_path += '/src/' + "point_cloud_registering" + "/config/" + param_file_name
+    param_file_path += '/src/' + "leo-assignment-clean" + "/config/" + param_file_name
 
     point_cloud_registering_node = Node(
         package='point_cloud_registering',
